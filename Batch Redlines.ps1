@@ -2,6 +2,7 @@
 .NAME
     Batch Redlines
 #>
+Set-ExecutionPolicy unrestricted
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -324,9 +325,7 @@ $CmdOriginalDelete_Click=
 $CmdRunRedlines_Click=
 {
 	if ($LstOriginal.Items.Count -ne $LstModified.Items.Count) 
-		{
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
+		{[System.Windows.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
     }ELSE{
         if ($txtOutputFolder.text -eq "")
             {
@@ -349,8 +348,7 @@ $CmdRunRedlines_Click=
                 Write-Host $OutputFilename
                 Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -Wait 
  			}
-        Add-Type -AssemblyName System.Windows.Forms
-        [System.Windows.Forms.MessageBox]::Show('Finished running redlines.')
+        [System.Windows.MessageBox]::Show('Finished running redlines.')
  
     }
 }
