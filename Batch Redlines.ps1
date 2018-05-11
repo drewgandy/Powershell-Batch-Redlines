@@ -2,7 +2,8 @@
 .NAME
     Batch Redlines
 #>
-Set-ExecutionPolicy unrestricted
+clear-host
+#Set-ExecutionPolicy unrestricted
 Add-Type -AssemblyName System.Windows.Forms
 [System.Windows.Forms.Application]::EnableVisualStyles()
 
@@ -154,7 +155,9 @@ $CmdRunRedlines.height           = 30
 $CmdRunRedlines.location         = New-Object System.Drawing.Point(655,450)
 $CmdRunRedlines.Font             = 'Arial,10'
 
-$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines))
+
+
+$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion))
 
 #region gui events {
 
@@ -324,8 +327,12 @@ $CmdOriginalDelete_Click=
 
 $CmdRunRedlines_Click=
 {
-	if ($LstOriginal.Items.Count -ne $LstModified.Items.Count) 
-		{[System.Windows.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
+	
+    if ($LstOriginal.Items.Count -ne $LstModified.Items.Count){ 
+		$PriorVersions = RunPriorVersions
+        if ($PriorVersions -eq "true"){return}
+        if ($PriorVersions -eq "NoEarlierVersion"){return}
+        [System.Windows.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
     }ELSE{
         if ($txtOutputFolder.text -eq "")
             {
@@ -335,22 +342,145 @@ $CmdRunRedlines_Click=
 	        $TxtOutputFolder.text = $FolderBrowser.SelectedPath
             }
         #if ($txtOutputFolder.text -eq ""){Return}
+        $sw = [Diagnostics.Stopwatch]::StartNew()
         for ($i=0; $i -lt $LstOriginal.Items.Count; $i++)
 			{
+                $comparemode = ' /comparemode="standard"'
                 $LstOriginal.SetSelected($i, $True)
                 $LstModified.SetSelected($i, $True)
 
-                $OriginalFilename = '/original="' + $LstOriginal.Items[$i] + '"'
-                Write-Host '/v ' + $OriginalFilename
-                $ModifiedFilename = '/modified="' + $LstModified.Items[$i] + '"'
-                Write-Host $ModifiedFilename
+                #$OriginalFilename = '/original="' + $LstOriginal.Items[$i] + '"'
+                #Write-Host '/v ' + $OriginalFilename
+                #$ModifiedFilename = '/modified="' + $LstModified.Items[$i] + '"'
+                #Write-Host $ModifiedFilename
                 $Outputfilename = '/outfile="' + $txtOutputFolder.text.trim('\') + '\' + $txtRedlineName.text + [io.path]::GetFileNameWithoutExtension($LstModified.Items[$i]) + '.' + $CmbRedlineFileType.text  + '"'
-                Write-Host $OutputFilename
-                Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -Wait 
+                Write-Host "Redline filename: " $OutputFilename
+
+# Test if original file is iManage NRL file
+                $obj = @()
+                $file = @()
+                write-host  "Original filename: " $LstOriginal.Items[$i]
+                $file = New-Object System.IO.FileInfo($LstOriginal.Items[$i])
+                if($file.Extension -eq ".nrl"){
+                    foreach($line in (Get-Content $LstOriginal.Items[$i])){
+                        if($line -eq "HKDMS"){continue}
+                        $nline = $line.Split("!") #-replace """",""
+                        $properties = @{
+                            'nrtdms' = $nline[1].split(":")[1]
+                            'session'  = $nline[2].split(":")[1]
+                            'database'   = $nline[3].split(":")[1]
+                            'document' = $nline[4].split(":")[1].split(",")[0]
+                            'version' = $nline[4].split(":")[1].split(",")[1]
+                        }
+                        $obj += New-Object PSObject -Property $properties
+                    }
+                    $OriginalFilename = '/original="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+                    write-host 'NRL File Found: ' $LstOriginal.Items[$i]
+                    write-host 'WC command: ' $OriginalFilename
+                }ELSE{
+                    $OriginalFilename = '/original="' + $LstOriginal.Items[$i] + '"'
+                    Write-Host "WC command: " $OriginalFilename
+                    if($file.Extension -eq ".pdf"){$comparemode = ' /comparemode="textonly"'}
+                }
+
+# Test if modified file is iManage NRL file
+                $obj = @()
+                $file = @()
+                $file = New-Object System.IO.FileInfo($LstModified.Items[$i])
+                if($file.Extension -eq ".nrl"){
+                    foreach($line in (Get-Content $LstModified.Items[$i])){
+                        if($line -eq "HKDMS"){continue}
+                        $nline = $line.Split("!") #-replace """",""
+                        $properties = @{
+                            'nrtdms' = $nline[1].split(":")[1]
+                            'session'  = $nline[2].split(":")[1]
+                            'database'   = $nline[3].split(":")[1]
+                            'document' = $nline[4].split(":")[1].split(",")[0]
+                            'version' = $nline[4].split(":")[1].split(",")[1]
+                        }
+                        $obj += New-Object PSObject -Property $properties
+                    }
+                    $ModifiedFilename = '/modified="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+                    write-host 'NRL File Found: ' $LstModified.Items[$i]
+                    write-host 'WC command: ' $ModifiedFilename
+                }ELSE{
+                    $ModifiedFilename = '/modified="' + $LstModified.Items[$i] + '"'
+                    write-host  "Modified filename: " $LstModified.Items[$i]
+                    Write-Host "WC command: " $ModifiedFilename
+                }
+                if($file.Extension -eq ".pdf"){$comparemode = ' /comparemode="textonly"'}
+                Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -Wait 
+                write-host  "Elapsed time (HH:MM:SS.MS): " $sw.Elapsed
  			}
-        [System.Windows.MessageBox]::Show('Finished running redlines.')
+        $sw.Stop()
+        [System.Windows.MessageBox]::Show('Finished running redlines.' + "`nRan " + $LstOriginal.Items.Count + " redlines in " + $sw.Elapsed + " (HH:MM:SS.MS)")
  
     }
+}
+
+function RunPriorVersions{
+    if ($txtOutputFolder.text -eq "")
+        {
+        Add-Type -AssemblyName System.Windows.Forms
+        $FolderBrowser = New-Object System.Windows.Forms.FolderBrowserDialog
+	    [void]$FolderBrowser.ShowDialog()
+	    $TxtOutputFolder.text = $FolderBrowser.SelectedPath
+        }
+
+# Test to see if all files in modified list are NRL files.  If not, exit function.
+    for ($i=0; $i -lt $LstModified.Items.Count; $i++)
+		{
+        $file = @()
+        $file = New-Object System.IO.FileInfo($LstModified.Items[$i])
+        if($file.Extension -ne ".nrl"){
+            return "false"
+            }
+        }
+
+# Cycle through all files in modified list and generate corresponding prior version.
+    for ($i=0; $i -lt $LstModified.Items.Count; $i++)
+		{
+            $LstModified.SetSelected($i, $True)
+
+            $Outputfilename = '/outfile="' + $txtOutputFolder.text.trim('\') + '\' + $txtRedlineName.text + [io.path]::GetFileNameWithoutExtension($LstModified.Items[$i]) + '.' + $CmbRedlineFileType.text  + '"'
+            Write-Host "Redline filename: "  $OutputFilename
+
+
+            $obj = @()
+
+            write-host  "Modified filename: " $LstModified.Items[$i]
+
+            foreach($line in (Get-Content $LstModified.Items[$i])){
+                if($line -eq "HKDMS"){continue}
+                $nline = $line.Split("!") #-replace """",""
+                $properties = @{
+                    'nrtdms' = $nline[1].split(":")[1]
+                    'session'  = $nline[2].split(":")[1]
+                    'database'   = $nline[3].split(":")[1]
+                    'document' = $nline[4].split(":")[1].split(",")[0]
+                    'version' = $nline[4].split(":")[1].split(",")[1]
+                }
+                $obj += New-Object PSObject -Property $properties
+            }
+            $ModifiedFilename = '/modified="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+            write-host 'NRL File Found: ' $LstModified.Items[$i]
+            write-host 'WC command: ' $ModifiedFilename
+# check if iManage file has an earlier version.
+            $OriginalVersion = [int]$obj.version - 1
+            if ($OriginalVersion -le 0){
+                [System.Windows.MessageBox]::Show('Skipping the following file because it does not have an earlier version: ' + $LstModified.Items[$i])
+            }else{
+
+                $OriginalFilename = '/original="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $OriginalVersion + '"'
+                write-host 'WC command: ' + $OriginalFilename
+
+                Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -Wait 
+ 		    }
+        }
+    [System.Windows.MessageBox]::Show('Finished running redlines.')
+    
+    return "true"
+
 }
 
 $LstOriginal_Click=
