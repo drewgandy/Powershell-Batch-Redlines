@@ -94,6 +94,13 @@ $CmdModifiedDelete.height        = 30
 $CmdModifiedDelete.location      = New-Object System.Drawing.Point(575,310)
 $CmdModifiedDelete.Font          = 'Arial,10'
 
+$CmdSort                         = New-Object system.Windows.Forms.Button
+$CmdSort.text                    = "Sort Lists Alphabetically"
+$CmdSort.width                   = 175
+$CmdSort.height                  = 30
+$CmdSort.location                = New-Object System.Drawing.Point(315,310)
+$CmdSort.Font                    = 'Arial,10'
+
 $Label3                          = New-Object system.Windows.Forms.Label
 $Label3.text                     = "Output Folder:"
 $Label3.AutoSize                 = $true
@@ -157,7 +164,7 @@ $CmdRunRedlines.Font             = 'Arial,10'
 
 
 
-$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion))
+$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion, $CmdSort))
 
 #region gui events {
 
@@ -341,7 +348,10 @@ $CmdRunRedlines_Click=
 	        [void]$FolderBrowser.ShowDialog()
 	        $TxtOutputFolder.text = $FolderBrowser.SelectedPath
             }
-        #if ($txtOutputFolder.text -eq ""){Return}
+        If(!(test-path $TxtOutputFolder.text))
+            {
+            New-Item -ItemType Directory -Force -Path $TxtOutputFolder.text
+            }
         $sw = [Diagnostics.Stopwatch]::StartNew()
         for ($i=0; $i -lt $LstOriginal.Items.Count; $i++)
 			{
@@ -414,7 +424,7 @@ $CmdRunRedlines_Click=
  			}
         $sw.Stop()
         [System.Windows.MessageBox]::Show('Finished running redlines.' + "`nRan " + $LstOriginal.Items.Count + " redlines in " + $sw.Elapsed + " (HH:MM:SS.MS)")
- 
+        Write-Host 'Finished running redlines.' "`nRan " $LstOriginal.Items.Count " redlines in " $sw.Elapsed " (HH:MM:SS.MS)"
     }
 }
 
@@ -499,6 +509,20 @@ $LstModified_Click=
         }
 
 }
+
+$CmdSort_Click=
+{ 
+    $LstOriginal.Sorted = $True
+    $LstOriginal.refresh()
+    $LstOriginal.Sorted = $False
+    $LstOriginal.refresh()
+    $LstModified.Sorted = $True
+    $LstModified.refresh()
+    $LstModified.Sorted = $False
+    $LstModified.refresh()
+
+}
+
 #endregion events }
 $LstOriginal.Add_DragDrop($LstOriginal_DragDrop)
 $LstOriginal.Add_DragOver($LstOriginal_DragOver)
@@ -514,6 +538,10 @@ $CmdOutputFolderBrowse.Add_Click($CmdOutputFolderBrowse_Click)
 $CmdRunRedlines.Add_Click($CmdRunRedlines_Click)
 $CmdModifiedDelete.Add_Click($CmdModifiedDelete_Click)
 $CmdOriginalDelete.Add_Click($CmdOriginalDelete_Click)
+$CmdSort.Add_Click($CmdSort_Click)
+
+
+
 
 #endregion GUI }
 
