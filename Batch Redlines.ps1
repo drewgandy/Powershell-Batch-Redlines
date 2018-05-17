@@ -9,6 +9,8 @@ Add-Type -AssemblyName System.Windows.Forms
 
 #region begin GUI{ 
 
+$SettingsFile                    = "settings.xml"
+
 $FrmMain                         = New-Object system.Windows.Forms.Form
 $FrmMain.ClientSize              = '800,500'
 $FrmMain.text                    = "Batch Redlines"
@@ -109,13 +111,14 @@ $Label3.height                   = 10
 $Label3.location                 = New-Object System.Drawing.Point(10,360)
 $Label3.Font                     = 'Arial,10'
 
-$TxtOutputFolder                 = New-Object system.Windows.Forms.TextBox
-$TxtOutputFolder.multiline       = $false
+$TxtOutputFolder                 = New-Object system.Windows.Forms.ComboBox
+#$TxtOutputFolder.multiline       = $false
 $TxtOutputFolder.width           = 337
 $TxtOutputFolder.height          = 20
 $TxtOutputFolder.location        = New-Object System.Drawing.Point(105,357)
 $TxtOutputFolder.Font            = 'Arial,10'
 $TxtOutputFolder.text            = [environment]::getfolderpath("UserProfile") +"\Downloads" #"C:\Users\dhgandy\Downloads"
+
 
 $CmdOutputFolderBrowse           = New-Object system.Windows.Forms.Button
 $CmdOutputFolderBrowse.text      = ". . ."
@@ -165,6 +168,25 @@ $CmdRunRedlines.Font             = 'Arial,10'
 
 
 $FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion, $CmdSort))
+
+# Add default paths to output folder combobox
+$TxtOutputFolder.items.add([environment]::getfolderpath("UserProfile") +"\Downloads")
+$TxtOutputFolder.items.add([environment]::getfolderpath("Desktop"))
+$TxtOutputFolder.items.add([environment]::getfolderpath("MyDocuments"))
+
+if (!(Test-Path $SettingsFile)) {
+    Write-Warning "$SettingsFile missing"
+}else{
+    $myDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+    [xml]$myXML = Get-Content settings.xml
+    Write-Host $myXML.settings.setting.value
+#    $TxtOutputFolder.items.add($myXML.settings.setting.value)
+    $TxtOutputFolder.text = $myXML.settings.setting.value
+    if(!($TxtOutputFolder.Items.Contains($myXML.settings.setting.value))){
+        $TxtOutputFolder.items.add($myXML.settings.setting.value)
+    }
+}
+
 
 #region gui events {
 
@@ -334,10 +356,15 @@ $CmdOriginalDelete_Click=
 
 $CmdRunRedlines_Click=
 {
-	
+	if(!($TxtOutputFolder.Items.Contains($TxtOutputFolder.text))){
+        $TxtOutputFolder.items.add($TxtOutputFolder.text)
+    }
     if ($LstOriginal.Items.Count -ne $LstModified.Items.Count){ 
 		$PriorVersions = RunPriorVersions
-        if ($PriorVersions -eq "true"){return}
+        if ($PriorVersions -eq "true"){
+            SaveOutputPathsToXML
+            return
+        }
         if ($PriorVersions -eq "NoEarlierVersion"){return}
         [System.Windows.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
     }ELSE{
@@ -352,6 +379,7 @@ $CmdRunRedlines_Click=
             {
             New-Item -ItemType Directory -Force -Path $TxtOutputFolder.text
             }
+        SaveOutputPathsToXML
         $sw = [Diagnostics.Stopwatch]::StartNew()
         for ($i=0; $i -lt $LstOriginal.Items.Count; $i++)
 			{
@@ -490,6 +518,19 @@ function RunPriorVersions{
     [System.Windows.MessageBox]::Show('Finished running redlines.')
     
     return "true"
+
+}
+
+function SaveOutputPathsToXML{
+    if (!(Test-Path $SettingsFile)) {
+        "<settings>" | Out-File settings.xml
+        '  <setting id="LastPath" value="' + $TxtOutputFolder.text + '" />' | Out-File settings.xml -Append
+        "</settings>" | Out-File settings.xml -Append
+    }else{
+        [xml]$myXML = Get-Content settings.xml
+        $myXML.settings.ChildNodes.Item(0).value = $txtOutputFolder.text.trim('\')
+        $myXML.save("settings.xml")
+    }
 
 }
 
