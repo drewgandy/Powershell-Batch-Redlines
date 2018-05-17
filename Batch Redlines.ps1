@@ -181,9 +181,11 @@ if (!(Test-Path $SettingsFile)) {
     [xml]$myXML = Get-Content settings.xml
     Write-Host $myXML.settings.setting.value
 #    $TxtOutputFolder.items.add($myXML.settings.setting.value)
-    $TxtOutputFolder.text = $myXML.settings.setting.value
-    if(!($TxtOutputFolder.Items.Contains($myXML.settings.setting.value))){
-        $TxtOutputFolder.items.add($myXML.settings.setting.value)
+    $TxtOutputFolder.text = $myXML.settings.LastPath
+    $TxtRedlineName.text = $myXML.settings.PrependName
+    $CmbRedlineFileType.text =$myXML.settings.FileType
+    if(!($TxtOutputFolder.Items.Contains($myXML.settings.LastPath))){
+        $TxtOutputFolder.items.add($myXML.settings.LastPath)
     }
 }
 
@@ -524,11 +526,23 @@ function RunPriorVersions{
 function SaveOutputPathsToXML{
     if (!(Test-Path $SettingsFile)) {
         "<settings>" | Out-File settings.xml
-        '  <setting id="LastPath" value="' + $TxtOutputFolder.text + '" />' | Out-File settings.xml -Append
+        '  <LastPath>' + $TxtOutputFolder.text + '</LastPath>' | Out-File settings.xml -Append
+        '  <PrependName>' + $TxtRedlineName.text + '</PrependName>' | Out-File settings.xml -Append
+        '  <FileType>' + $CmbRedlineFileType.text + '</FileType>' | Out-File settings.xml -Append
         "</settings>" | Out-File settings.xml -Append
+
+#        "<settings>" | Out-File settings.xml
+#        '  <setting id="LastPath" value="' + $TxtOutputFolder.text + '" />' | Out-File settings.xml -Append
+#        '  <setting id="PrependName" value="' + $TxtRedlineName.text + '" />' | Out-File settings.xml -Append
+#        '  <setting id="FileType" value="' + $CmbRedlineFileType.text + '" />' | Out-File settings.xml -Append
+#        "</settings>" | Out-File settings.xml -Append
+
+
     }else{
         [xml]$myXML = Get-Content settings.xml
-        $myXML.settings.ChildNodes.Item(0).value = $txtOutputFolder.text.trim('\')
+        $myXML.settings.LastPath = $txtOutputFolder.text.trim('\')
+        $myXML.settings.PrependName = $TxtRedlineName.text.trim('\')
+        $myXML.settings.FileType = $CmbRedlineFileType.text.trim('\')
         $myXML.save("settings.xml")
     }
 
