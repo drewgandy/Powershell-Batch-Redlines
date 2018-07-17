@@ -364,12 +364,12 @@ $CmdRunRedlines_Click=
     if ($LstOriginal.Items.Count -ne $LstModified.Items.Count){ 
 		$PriorVersions = RunPriorVersions
         if ($PriorVersions -eq "true"){
-            SaveOutputPathsToXML
             return
         }
         if ($PriorVersions -eq "NoEarlierVersion"){return}
         [System.Windows.MessageBox]::Show('The number of modified documents does not match the number of original documents.  Please ensure there are corresponding documents between the two lists.')
     }ELSE{
+        SaveOutputPathsToXML
         if ($txtOutputFolder.text -eq "")
             {
         	Add-Type -AssemblyName System.Windows.Forms
@@ -449,7 +449,8 @@ $CmdRunRedlines_Click=
                     Write-Host "WC command: " $ModifiedFilename
                 }
                 if($file.Extension -eq ".pdf"){$comparemode = ' /comparemode="textonly"'}
-                Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -Wait 
+                $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -passthru #-Wait 
+ 		        $p.WaitForExit()
                 write-host  "Elapsed time (HH:MM:SS.MS): " $sw.Elapsed
  			}
         $sw.Stop()
@@ -476,8 +477,12 @@ function RunPriorVersions{
             return "false"
             }
         }
-
+# save existing settings to XML
+    SaveOutputPathsToXML
 # Cycle through all files in modified list and generate corresponding prior version.
+ 	write-host '####################################################################################'
+    write-host 'Original file list is empty.  Running iManage NRL files against their prior version.'
+    write-host '####################################################################################'
     for ($i=0; $i -lt $LstModified.Items.Count; $i++)
 		{
             $LstModified.SetSelected($i, $True)
@@ -512,10 +517,13 @@ function RunPriorVersions{
             }else{
 
                 $OriginalFilename = '/original="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $OriginalVersion + '"'
-                write-host 'WC command: ' + $OriginalFilename
+                write-host 'WC command: ' $OriginalFilename
 
-                Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -Wait 
- 		    }
+                $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -passthru #-Wait 
+ 		        $p.WaitForExit()
+                write-host '#####################################################'
+                write-host '  '
+ }
         }
     [System.Windows.MessageBox]::Show('Finished running redlines.')
     
