@@ -165,9 +165,17 @@ $CmdRunRedlines.height           = 30
 $CmdRunRedlines.location         = New-Object System.Drawing.Point(655,450)
 $CmdRunRedlines.Font             = 'Arial,10'
 
+$ChangePages                     = New-Object system.Windows.Forms.CheckBox
+$ChangePages.text                = "Output change pages only"
+$ChangePages.AutoSize            = $false
+$ChangePages.width               = 200
+$ChangePages.height              = 20
+$ChangePages.enabled             = $true
+$ChangePages.location            = New-Object System.Drawing.Point(10,423)
+$ChangePages.Font                = 'Arial,10'
 
 
-$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion, $CmdSort))
+$FrmMain.controls.AddRange(@($Label1,$Label2,$LstOriginal,$LstModified,$CmdOriginalMoveUp,$CmdModifiedMoveUp,$CmdOriginalMoveDown,$CmdModifiedMoveDown,$CmdOriginalDelete,$CmdModifiedDelete,$Label3,$TxtOutputFolder,$CmdOutputFolderBrowse,$TxtRedlineName,$Label4,$Label5,$CmbRedlineFileType,$CmdRunRedlines, $CmdRunPriorVersion, $CmdSort, $ChangePages))
 
 # Add default paths to output folder combobox
 $TxtOutputFolder.items.add([environment]::getfolderpath("UserProfile") +"\Downloads")
@@ -385,7 +393,7 @@ $CmdRunRedlines_Click=
         $sw = [Diagnostics.Stopwatch]::StartNew()
         for ($i=0; $i -lt $LstOriginal.Items.Count; $i++)
 			{
-                $comparemode = ' /comparemode="standard"'
+                $comparemode = ' /comparemode="Fast"'  #standard
                 $LstOriginal.SetSelected($i, $True)
                 $LstModified.SetSelected($i, $True)
 
@@ -403,7 +411,7 @@ $CmdRunRedlines_Click=
                 $file = New-Object System.IO.FileInfo($LstOriginal.Items[$i])
                 if($file.Extension -eq ".nrl"){
                     foreach($line in (Get-Content $LstOriginal.Items[$i])){
-                        if($line -eq "HKDMS"){continue}
+                        if($line -eq "HKDMS" -or $line -eq "hkdocs.hklaw.com"){continue}
                         $nline = $line.Split("!") #-replace """",""
                         $properties = @{
                             'nrtdms' = $nline[1].split(":")[1]
@@ -414,7 +422,7 @@ $CmdRunRedlines_Click=
                         }
                         $obj += New-Object PSObject -Property $properties
                     }
-                    $OriginalFilename = '/original="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+                    $OriginalFilename = '/original="iManage://hkdocs.hklaw.com/Active/' + $obj.document + '/' + $obj.version + '"'
                     write-host 'NRL File Found: ' $LstOriginal.Items[$i]
                     write-host 'WC command: ' $OriginalFilename
                 }ELSE{
@@ -429,7 +437,7 @@ $CmdRunRedlines_Click=
                 $file = New-Object System.IO.FileInfo($LstModified.Items[$i])
                 if($file.Extension -eq ".nrl"){
                     foreach($line in (Get-Content $LstModified.Items[$i])){
-                        if($line -eq "HKDMS"){continue}
+                        if($line -eq "HKDMS" -or $line -eq "hkdocs.hklaw.com"){continue}
                         $nline = $line.Split("!") #-replace """",""
                         $properties = @{
                             'nrtdms' = $nline[1].split(":")[1]
@@ -440,7 +448,7 @@ $CmdRunRedlines_Click=
                         }
                         $obj += New-Object PSObject -Property $properties
                     }
-                    $ModifiedFilename = '/modified="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+                    $ModifiedFilename = '/modified="iManage://hkdocs.hklaw.com/Active/' + $obj.document + '/' + $obj.version + '"'
                     write-host 'NRL File Found: ' $LstModified.Items[$i]
                     write-host 'WC command: ' $ModifiedFilename
                 }ELSE{
@@ -449,7 +457,13 @@ $CmdRunRedlines_Click=
                     Write-Host "WC command: " $ModifiedFilename
                 }
                 if($file.Extension -eq ".pdf"){$comparemode = ' /comparemode="textonly"'}
-                $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -passthru #-Wait 
+                if($ChangePages.checked -eq $true) {
+                    write-host 'Outputing change pages only'
+                    $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', '/c', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -passthru #-Wait 
+                }else{
+                    write-host 'Outputing full redlines'
+                    $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename, $comparemode -passthru #-Wait 
+                }
  		        $p.WaitForExit()
                 write-host  "Elapsed time (HH:MM:SS.MS): " $sw.Elapsed
  			}
@@ -489,14 +503,15 @@ function RunPriorVersions{
 
             $Outputfilename = '/outfile="' + $txtOutputFolder.text.trim('\') + '\' + $txtRedlineName.text + [io.path]::GetFileNameWithoutExtension($LstModified.Items[$i]) + '.' + $CmbRedlineFileType.text  + '"'
             Write-Host "Redline filename: "  $OutputFilename
-
+            
+            $comparemode = ' /comparemode="Fast"'  #standard
 
             $obj = @()
 
             write-host  "Modified filename: " $LstModified.Items[$i]
 
             foreach($line in (Get-Content $LstModified.Items[$i])){
-                if($line -eq "HKDMS"){continue}
+                if($line -eq "HKDMS" -or $line -eq "hkdocs.hklaw.com"){continue}
                 $nline = $line.Split("!") #-replace """",""
                 $properties = @{
                     'nrtdms' = $nline[1].split(":")[1]
@@ -507,19 +522,27 @@ function RunPriorVersions{
                 }
                 $obj += New-Object PSObject -Property $properties
             }
-            $ModifiedFilename = '/modified="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $obj.version + '"'
+            $ModifiedFilename = '/modified="iManage://hkdocs.hklaw.com/Active/' + $obj.document + '/' + $obj.version + '"'
             write-host 'NRL File Found: ' $LstModified.Items[$i]
             write-host 'WC command: ' $ModifiedFilename
+
+
 # check if iManage file has an earlier version.
             $OriginalVersion = [int]$obj.version - 1
             if ($OriginalVersion -le 0){
                 [System.Windows.MessageBox]::Show('Skipping the following file because it does not have an earlier version: ' + $LstModified.Items[$i])
             }else{
 
-                $OriginalFilename = '/original="interwovenSite://HKDMS/Active/' + $obj.document + '/' + $OriginalVersion + '"'
+                $OriginalFilename = '/original="iManage://hkdocs.hklaw.com/Active/' + $obj.document + '/' + $OriginalVersion + '"'
                 write-host 'WC command: ' $OriginalFilename
 
-                $p = Start-Process -FilePath "deltavw.exe" -ArgumentList '/v', $OriginalFilename, $Modifiedfilename, $Outputfilename -passthru #-Wait 
+                if($ChangePages.checked -eq $true) {
+                    write-host 'Outputing change pages only'
+                    $p = Start-Process -FilePath "deltavw.exe" -ArgumentList "/v", $comparemode, "/c", $OriginalFilename, $Modifiedfilename, $Outputfilename -passthru #-Wait 
+                }else{
+                    write-host 'Outputing full redlines'
+                    $p = Start-Process -FilePath "deltavw.exe" -ArgumentList "/v", $comparemode, $OriginalFilename, $Modifiedfilename, $Outputfilename -passthru #-Wait  
+                }
  		        $p.WaitForExit()
                 write-host '#####################################################'
                 write-host '  '
